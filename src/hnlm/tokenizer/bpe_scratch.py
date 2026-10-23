@@ -89,12 +89,13 @@ def merge(ids: list[int] | tuple[int, ...], pair: Pair, new_id: int) -> list[int
     i = 0
     while i < len(ids):
         if i + 1 < len(ids) and (ids[i], ids[i + 1]) == pair:
-            out.append(new_id)      # found the pair: write the new id
-            i += 2           # skip how many positions?
+            out.append(new_id)  # found the pair: write the new id
+            i += 2  # skip how many positions?
         else:
-            out.append(ids[i])      # not the pair: copy this number
+            out.append(ids[i])  # not the pair: copy this number
             i += 1
     return out
+
 
 class BPETokenizer:
     def __init__(self, special_tokens: Iterable[str] = ("<|endoftext|>",)) -> None:
@@ -115,14 +116,14 @@ class BPETokenizer:
         chunk_counts: Counter[str] = Counter()
         for text in texts:
             chunk_counts.update(pretokenize(text))
-        words: dict[tuple[int, ...], int] = {  # noqa: F841 (used by your TODO)
+        words: dict[tuple[int, ...], int] = {
             tuple(chunk.encode("utf-8")): freq for chunk, freq in chunk_counts.items()
         }
 
         self.merges = {}
         self.vocab = {i: bytes([i]) for i in range(256)}
         for i in range(n_merges):
-            new_id = 256 + i  # noqa: F841 (used by your TODO)
+            new_id = 256 + i
             # TODO(you): the merge loop. Four steps:
             #   1. counts = count_pairs(words); if it's empty, break (nothing left to merge)
             #   2. best = the most frequent pair (ties -> first seen; max(counts, key=...))
@@ -135,13 +136,13 @@ class BPETokenizer:
             counts = count_pairs(words)
             if not counts:
                 break
-            best = max(counts, key=counts.get)       # the most frequent pair
+            best = max(counts, key=counts.get)  # the most frequent pair
             a, b = best
             self.merges[best] = new_id
             self.vocab[new_id] = self.vocab[a] + self.vocab[b]
             new_words = {}
             for chunk, freq in words.items():
-                merged = tuple(merge(chunk,best, new_id))
+                merged = tuple(merge(chunk, best, new_id))
                 new_words[merged] = new_words.get(merged, 0) + freq
             words = new_words
             if verbose:
