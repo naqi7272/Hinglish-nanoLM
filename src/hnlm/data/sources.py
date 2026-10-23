@@ -14,7 +14,6 @@ import gzip
 import io
 import json
 import lzma
-import sys
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -89,7 +88,8 @@ def _iter_local(src: Source) -> Iterator[str]:
     if not root.exists():
         raise FileNotFoundError(f"{src.name}: {root} does not exist (download it first)")
     files = sorted(p for p in root.rglob("*") if p.is_file()) if root.is_dir() else [root]
-    csv.field_size_limit(sys.maxsize)
+    # Allow very long CSV cells. 2**31 - 1, not sys.maxsize: a C long is 32-bit on Windows.
+    csv.field_size_limit(2**31 - 1)
     for path in files:
         kind = _logical_suffix(path)
         with _open_text(path) as f:
