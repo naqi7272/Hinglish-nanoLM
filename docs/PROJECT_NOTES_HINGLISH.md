@@ -28,11 +28,11 @@ KV cache) khud likha, 3 sizes ke models train kiye, aur bits-per-byte se fair co
 | M0 | Project setup: uv, tests, CPU/GPU auto-detect | ✅ |
 | M1 | Corpus pipeline: download → clean → dedup → split | ✅ 4.6M docs, 1.45 GB ready |
 | M2a | BPE tokenizer scratch se (merge loop **maine khud likha**) | ✅ 16/16 tests pass |
-| M2b | Production tokenizer (16k) + GPT-4o / Llama 3 / Qwen3 se comparison | ⏳ code ready, Colab pe run karna hai |
-| M3 | GPT model plain PyTorch mein (attention **main khud likhunga**) | ⏳ |
-| M4 | Training loop: AdamW, cosine LR, mixed precision, checkpoints | ⏳ |
-| M5 | Experiments: 5M / 15M / 30M models, scaling plots, KV-cache speed | ⏳ |
-| M6 | README write-up | ⏳ |
+| M2b | Production tokenizer (16k) + GPT-4o / Llama 3 / Qwen3 se comparison | ✅ code, ⏳ notebook 02 run karna hai |
+| M3 | GPT model plain PyTorch mein | ✅ code + tests |
+| M4 | Training loop: AdamW, cosine LR, mixed precision, checkpoints | ✅ code + tests |
+| M5 | Experiments: 5M / 15M / 30M models, scaling plots, KV-cache speed | ✅ code, ⏳ notebook 03 (GPU) run karna hai |
+| M6 | README write-up | ✅ explanations, ⏳ result numbers |
 
 ---
 
@@ -254,25 +254,122 @@ optimize.
 
 ---
 
-## 10. Aage kya aayega (short preview)
+## 10. Production tokenizer + comparison (M2b)
 
-- **Tokenizer comparison:** fertility (tokens per word) aur bytes per token: English vs
-  Hindi vs Roman Hinglish, mera tokenizer vs GPT-4o / Llama 3 / Qwen3, plots ke saath.
-- **GPT model:** causal self-attention, RoPE, RMSNorm, SwiGLU, weight tying, KV cache,
-  sampling (temperature, top-k, top-p).
-- **Training:** AdamW, warmup + cosine LR, gradient clipping, gradient accumulation, mixed
-  precision, Colab-disconnect-safe checkpoints, W&B logging.
-- **Experiments:** 3 model sizes, loss vs size aur tokens seen; **bits-per-byte** se
-  tokenizers ka fair comparison; KV cache se generation kitni fast hoti hai.
+### Kya kiya
+- Same BPE recipe Hugging Face `tokenizers` (Rust) mein: `hinglish16k` (Roman Hinglish +
+  Hindi + thodi English pe trained) aur baseline `english16k` (sirf English).
+- Comparison: mera tokenizer vs GPT-2, GPT-4o, Llama 3, Qwen3 on English / Hindi /
+  Roman Hinglish. Metrics: **fertility** (tokens per word), chars per token, example
+  segmentations, plots.
 
-**Q (aane wala): Loss ki jagah bits-per-byte kyun?**
-A: Alag tokenizers alag number of tokens banate hain, toh per-token loss compare karna unfair
-hai. Bits-per-byte = total loss (bits mein) ÷ text ke UTF-8 bytes, jo tokenizer pe depend nahi
-karta.
+### Interview Q&A
+**Q: Fertility kya hai?**
+A: Ek word ke liye average kitne tokens lagte hain. 1.0 matlab har word ek token. Hindi pe
+English-centric tokenizers ki fertility bahut zyada hoti hai ("Hindi tax").
+
+**Q: Tumhara 16k tokenizer GPT-4o (200k) se compare karna fair hai?**
+A: Poori tarah nahi: bade vocab mein zyada words fit hote hain. Isliye maine alag se 16k vs
+16k (hinglish16k vs english16k) same model pe compare kiya, bits-per-byte se.
 
 ---
 
-## 11. Kya ye project karne layak hai?
+## 11. GPT model (M3)
+
+### Kya kiya
+Plain PyTorch mein decoder-only GPT: embedding → N blocks (RMSNorm → attention → residual,
+RMSNorm → SwiGLU → residual) → RMSNorm → output layer (embedding ke saath tied).
+Sizes: 4.8M, 14.2M, 32.1M non-embedding parameters.
+
+### Interview Q&A
+**Q: Self-attention simple words mein?**
+A: Har token ek query ("main kya dhoondh raha hoon"), key ("mere paas kya hai") aur value
+("main kya pass karunga") banata hai. Query·key se score, softmax se weights, phir values ka
+weighted sum. Score ko √d_head se divide karte hain taaki softmax saturate na ho.
+
+**Q: Causal mask kyun?**
+A: Language model ko agla token predict karna hai, toh future tokens dekhna cheating hai.
+Future positions ka score −∞ kar dete hain, softmax ke baad weight 0. Test: future token
+badlo, pichle outputs same rehne chahiye.
+
+**Q: RoPE kya hai, learned position embedding se better kyun?**
+A: Query/key vectors ko position ke hisaab se rotate karte hain. Rotation ki wajah se q·k
+sirf do tokens ki **distance** pe depend karta hai (relative position). Koi extra parameters
+nahi, aur Llama/Qwen yahi use karte hain.
+
+**Q: RMSNorm vs LayerNorm?**
+A: LayerNorm mean subtract karta hai aur bias add karta hai; RMSNorm sirf scale normalize
+karta hai. Sasta hai aur kaam utna hi accha karta hai.
+
+**Q: SwiGLU kyun?**
+A: Gated MLP: ek branch (SiLU) decide karti hai doosri branch ka kitna signal jaaye. Plain
+GELU MLP se consistently better. Hidden size 8/3·d rakha taaki parameters 4·d MLP jitne rahein.
+
+**Q: Weight tying kya hai?**
+A: Input embedding aur output layer ek hi matrix share karte hain. Chhote model mein 4–8M
+parameters bachte hain, aur quality usually thodi better hoti hai.
+
+**Q: KV cache kya hai? Kitna fast hota hai?**
+A: Generation mein har naye token ke liye purane tokens ke keys/values dobara compute karne
+ki zaroorat nahi: unhe store karo. Bina cache har step poora sequence process hota hai
+(O(n²) total). Mere CPU pe 5M model ke saath bhi 64 tokens pe ~3.8x fast tha; lambe
+sequences pe gap aur badhta hai. Test: cache wala output == bina cache wala output.
+
+**Q: Temperature, top-k, top-p?**
+A: Temperature: kam = safe/repetitive, zyada = creative/galtiyan. Top-k: sirf k best tokens
+mein se choose. Top-p: sabse chhota set jiski probability p tak pahunche: model sure ho toh
+kam options, unsure ho toh zyada.
+
+---
+
+## 12. Training (M4)
+
+### Kya kiya
+- Corpus ko ek baar tokenize karke `uint16` files mein store kiya; training random 512-token
+  windows padhti hai.
+- AdamW, warmup + cosine LR, gradient clipping 1.0, gradient accumulation (65,536 tokens per
+  step), mixed precision (bf16 ya fp16 + GradScaler).
+- Checkpoint har 250 steps pe Google Drive pe, atomic save. Batches step number se seeded:
+  resume karne pe result **bit-for-bit same** (test likha hai).
+
+### Interview Q&A
+**Q: Warmup kyun?**
+A: Shuru mein Adam ke running statistics galat hote hain; bada LR model ko bigaad sakta hai.
+Isliye LR dheere dheere badhate hain, phir cosine se ghatate hain taaki end mein model settle ho.
+
+**Q: Gradient accumulation kya hai?**
+A: GPU memory mein bada batch fit nahi hota, toh chhote micro-batches ke gradients add karke
+ek baar optimizer step lete hain. Effect bade batch jaisa.
+
+**Q: Gradient clipping kyun?**
+A: Ek kharab batch se bahut bada gradient aa sakta hai jo weights ko door phek de (loss
+spike). Norm 1.0 se zyada ho toh scale down kar dete hain.
+
+**Q: Colab disconnect ho gaya toh?**
+A: Same command dobara chalao: latest checkpoint se continue. Checkpoint temp file mein likh
+ke rename hota hai, toh half-written file kabhi nahi banti. Data order step se seeded hai,
+toh resume ke baad bhi exactly same batches.
+
+**Q: Kitne tokens pe train kiya, kyun?**
+A: ~20 tokens per parameter (Chinchilla rule of thumb): 100M / 300M / 600M tokens. 30M model
+data ko lagbhag 2 baar dekhta hai, jo is scale pe theek hai.
+
+---
+
+## 13. Evaluation: bits-per-byte (M5)
+
+**Q: Loss ki jagah bits-per-byte kyun?**
+A: Alag tokenizers alag number of tokens banate hain, toh per-token loss compare karna unfair
+hai. BPB = total loss (bits mein) ÷ text ke UTF-8 bytes. Same text, same bytes, tokenizer
+koi bhi ho, toh fair comparison.
+
+**Q: Tumhare experiments kya dikhate hain?**
+A: *(results aane ke baad bharna)* (1) Bade model ka loss kam, (2) same 15M model pe Hinglish
+tokenizer vs English tokenizer ka BPB difference, Hindi pe sabse zyada, (3) KV cache speedup.
+
+---
+
+## 14. Kya ye project karne layak hai?
 
 **Haan, agar goal seekhna aur portfolio hai.** Honestly:
 
@@ -294,7 +391,7 @@ limitation hai, scale badhaun toh ye try karunga."
 
 ---
 
-## 12. Engineering project hai ya research?
+## 15. Engineering project hai ya research?
 
 **Dono ka mix, lekin zyada engineering (~70%) + thoda research (~30%).**
 
@@ -310,19 +407,22 @@ Engineer, ya LLM/NLP roles ke liye best fit hai.
 
 ---
 
-## 13. Resume ke liye bullet points (project complete hone ke baad numbers update karna)
+## 16. Resume ke liye bullet points (project complete hone ke baad numbers update karna)
 
 - Built a Hinglish corpus pipeline (6.9M+ docs) with Unicode-aware cleaning and from-scratch
   **MinHash-LSH deduplication** in numpy; deterministic hash-based train/val split.
 - Implemented **byte-level BPE from scratch**; found and fixed a Devanagari pre-tokenization
   issue (combining marks split by GPT-4's regex).
 - Compared tokenizer fertility vs **GPT-4o, Llama 3, Qwen3** on English / Hindi / Roman Hinglish. *(numbers TBD)*
-- Implemented a decoder-only GPT in plain PyTorch (**RoPE, RMSNorm, SwiGLU, KV cache**);
-  trained 5M/15M/30M models on free GPUs with resumable checkpoints. *(results TBD)*
+- Implemented a decoder-only GPT in plain PyTorch (**RoPE, RMSNorm, SwiGLU, KV cache**) with
+  tests for causality and cache correctness; trained 5M/15M/30M models on free GPUs with
+  bit-exact resumable checkpoints. *(results TBD)*
+- Compared a Hinglish vs English-only 16k tokenizer at equal model size using
+  **bits-per-byte**. *(results TBD)*
 
 ---
 
-## 14. Extra tricky interview questions (practice ke liye)
+## 17. Extra tricky interview questions (practice ke liye)
 
 1. **Hindi ko English se zyada tokens kyun lagte hain?** UTF-8 mein Devanagari 3 bytes/char, aur
    English-heavy training data ki wajah se tokenizer ne Hindi ke kam merges seekhe.

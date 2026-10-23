@@ -172,6 +172,8 @@ token ids → embedding → [ RMSNorm → attention → + ] → [ RMSNorm → Sw
 
 ## Reproduce
 
+Step-by-step (with secrets setup and what to do on disconnects): [`docs/RUN_CHECKLIST.md`](docs/RUN_CHECKLIST.md).
+
 | Step | Where | Notebook | Time |
 |---|---|---|---|
 | 1. Build corpus | Colab CPU | `notebooks/01_prepare_data.ipynb` | ~1 h |
