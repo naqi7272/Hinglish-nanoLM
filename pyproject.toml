@@ -1,0 +1,45 @@
+[project]
+name = "hnlm"
+version = "0.1.0"
+description = "Hinglish-nanoLM: a Hinglish tokenizer and a small GPT, built from scratch to learn LLM internals."
+readme = "README.md"
+requires-python = ">=3.10"  # dev pins 3.12 (.python-version); >=3.10 so Colab/Kaggle images work
+dependencies = [
+    "torch>=2.4",
+    "numpy>=1.26",
+    "pyyaml>=6.0",
+    "tqdm>=4.66",
+    "regex>=2024.0",
+    "tokenizers>=0.20",
+    "matplotlib>=3.8",
+]
+
+[project.optional-dependencies]
+# Downloading corpora from the Hugging Face Hub (run in Colab/Kaggle).
+data = ["datasets>=3.0", "huggingface_hub>=0.25", "gdown>=5.0"]
+# Reference tokenizers for the comparison. transformers is used ONLY for AutoTokenizer.
+compare = ["tiktoken>=0.8", "transformers>=4.45"]
+wandb = ["wandb>=0.18"]
+
+[dependency-groups]
+dev = ["pytest>=8.0", "ruff>=0.6"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/hnlm"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+# zip(ids, ids[1:]) is the idiom for adjacent pairs; strict= would only add noise.
+ignore = ["B905"]

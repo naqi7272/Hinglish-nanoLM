@@ -1,0 +1,30 @@
+Yaar aaj office mein bahut kaam tha, ghar pahunchte pahunchte raat ho gayi.
+Kal movie dekhne chalein? Mujhe lagta hai weekend pe bheed kam hogi.
+Bhai tu itna late kyun aaya, meeting toh das baje start ho gayi thi.
+Mummy ne bola ki khana garam hai, jaldi aa jao warna thanda ho jayega.
+Ye phone ki battery ek din bhi nahi chalti, naya lena padega shayad.
+Exam ke pehle raat ko padhai karna meri purani aadat hai.
+Traffic itna zyada tha ki auto wale ne bhi mana kar diya.
+Kya tumne naya cafe try kiya? Wahan ki chai ekdum mast hai.
+Monsoon aate hi sab log pakode aur chai ki baat karne lagte hain.
+Mera internet phir se slow ho gaya, video call baar baar cut ho rahi hai.
+आज मौसम बहुत अच्छा है, चलो पार्क में टहलने चलते हैं।
+मुझे हिंदी किताबें पढ़ना बहुत पसंद है, खासकर प्रेमचंद की कहानियाँ।
+भारत एक विशाल देश है जहाँ अनेक भाषाएँ बोली जाती हैं।
+कल रात बारिश की वजह से बिजली चली गई थी।
+बच्चों ने स्कूल में स्वतंत्रता दिवस पर एक सुंदर नाटक प्रस्तुत किया।
+किसान इस साल अच्छी फसल की उम्मीद कर रहे हैं।
+रेलगाड़ी समय पर स्टेशन पहुँच गई और यात्री खुश हो गए।
+हमारे मोहल्ले में एक नया पुस्तकालय खुला है।
+The quick brown fox jumps over the lazy dog near the river bank.
+Language models learn to predict the next token from a long sequence of text.
+A tokenizer splits text into pieces that the model can turn into numbers.
+Training a small model on a laptop is slow, but it is a great way to learn.
+Mujhe ye project bahut interesting laga, especially tokenizer wala part.
+Office ka laptop slow hai lekin kaam chal jata hai, koi baat nahi.
+Aaj ka match dekha? Last over mein kya zabardast six maara!
+मैं कल Delhi जा रहा हूँ, वहाँ meeting है।
+Weekend pe family ke saath picnic plan kiya hai, bas mausam accha rahe.
+Ye gaana sun ke purani yaadein taaza ho gayi yaar.
+Doctor ne bola hai roz subah walk karo aur cheeni kam khao.
+Naukri ke interview mein unhone mujhse Python aur SQL ke baare mein poocha.

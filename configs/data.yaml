@@ -1,0 +1,76 @@
+# Corpus recipe. Every source lists its license so the README can credit it.
+#
+# role: train -> split into train/val and used for pretraining + tokenizer training
+#       eval  -> held out entirely; only used to measure bits-per-byte on clean Hinglish
+#
+# budget_mb caps how much RAW text we pull from a source (UTF-8 megabytes, before cleaning).
+# Devanagari characters are 3 bytes each in UTF-8, so 1 MB of Hindi is fewer characters
+# than 1 MB of Roman Hinglish. That's fine: tokens-per-byte is what we care about later.
+#
+# NOTE: field names / data_dir values marked "verify" were taken from dataset cards and
+# papers; `scripts/prepare_data.py --stages peek` prints the first rows so we can confirm.
+
+data_dir: data
+seed: 1337
+val_fraction: 0.005        # 0.5% of each train source goes to validation
+
+sources:
+  - name: hingcorpus
+    role: train
+    script: latn            # Roman-script Hindi-English code-mixed tweets
+    license: CC-BY-NC-SA-4.0
+    url: https://github.com/l3cube-pune/code-mixed-nlp
+    loader: local
+    # Downloaded in the notebook with gdown from the Google Drive link in the L3Cube README.
+    path: data/downloads/hingcorpus
+    text_field: null        # null -> .txt is one doc per line; .csv uses the first column
+    budget_mb: 700
+
+  - name: sangraha_hin
+    role: train
+    script: deva            # Devanagari Hindi, "verified" (human-checked) web + PDF text
+    license: CC-BY-4.0
+    url: https://huggingface.co/datasets/ai4bharat/sangraha
+    loader: hf
+    hf_id: ai4bharat/sangraha
+    hf_kwargs: {data_dir: verified/hin, split: train}   # verify
+    text_field: text                                    # verify
+    budget_mb: 900
+
+  - name: fineweb_edu_en
+    role: train
+    script: latn            # a small English slice so the model (and the plots) see English
+    license: ODC-By-1.0
+    url: https://huggingface.co/datasets/HuggingFaceFW/fineweb-edu
+    loader: hf
+    hf_id: HuggingFaceFW/fineweb-edu
+    hf_kwargs: {name: sample-10BT, split: train}
+    text_field: text
+    budget_mb: 150
+
+  - name: phinc
+    role: eval
+    script: latn            # clean, human-written Roman Hinglish sentences
+    license: CC-BY-4.0
+    url: https://huggingface.co/datasets/veezbo/phinc
+    loader: hf
+    hf_id: veezbo/phinc
+    hf_kwargs: {split: train}
+    text_field: Sentence    # verify
+    budget_mb: 10
+
+clean:
+  min_chars: 20
+  min_words: 3
+  max_chars: 100000         # drop giant pages (usually scraped tables / junk)
+  max_repeat_char: 3        # "sooooo" -> "sooo"
+  min_allowed_letter_frac: 0.9   # letters must be >=90% Latin or Devanagari
+  max_digit_symbol_frac: 0.3
+  drop_emoji: true
+
+dedup:
+  ngram: 5                  # character 5-grams ("shingles")
+  num_perm: 64              # MinHash signature length
+  bands: 16                 # 16 bands x 4 rows: generous candidate search (centre ~0.5)...
+  max_chars: 4000           # only shingle the first 4000 chars of long docs (speed)
+  jaccard_threshold: 0.7    # ...then candidates must agree on >=70% of the signature
