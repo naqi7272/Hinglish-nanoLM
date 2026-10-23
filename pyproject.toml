@@ -38,6 +38,7 @@ addopts = "-q"
 [tool.ruff]
 line-length = 100
 src = ["src"]
+extend-exclude = ["notebooks"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]

@@ -7,10 +7,10 @@ __pycache__/
 *.egg-info/
 
 # Large artifacts (live on Drive / Kaggle, not in git)
-data/
-checkpoints/
-wandb/
-runs/
+/data/
+/checkpoints/
+/wandb/
+/runs/
 
 # Notebooks
 .ipynb_checkpoints/
