@@ -26,8 +26,8 @@ def main() -> None:
     ap.add_argument("--workers", type=int, default=None)
     args = ap.parse_args()
 
-    cfg = load_data_config(args.config)
-    data_dir = Path(args.data_dir or cfg["data_dir"])
+    cfg = load_data_config(args.config, args.data_dir)
+    data_dir = Path(cfg["data_dir"])
     sources = cfg["sources"]
     if args.only:
         wanted = set(args.only.split(","))

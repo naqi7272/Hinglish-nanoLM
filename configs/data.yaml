@@ -21,8 +21,9 @@ sources:
     license: CC-BY-NC-SA-4.0
     url: https://github.com/l3cube-pune/code-mixed-nlp
     loader: local
-    # Downloaded in the notebook with gdown from the Google Drive link in the L3Cube README.
-    path: data/downloads/hingcorpus
+    # Downloaded in the notebook with gdown from the Google Drive link in the L3Cube README
+    # (a 2.4 GB .tar.gz, read directly without unpacking). Relative to data_dir.
+    path: downloads/hingcorpus
     text_field: null        # null -> .txt is one doc per line; .csv uses the first column
     budget_mb: 700
 
