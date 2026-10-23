@@ -158,7 +158,8 @@ def write_jsonl(path: Path, rows: Iterator[dict]) -> int:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
     n = 0
-    with open(tmp, "w", encoding="utf-8") as f:
+    # Big write buffer: far fewer, larger writes (matters a lot on network drives).
+    with open(tmp, "w", encoding="utf-8", buffering=1 << 20) as f:
         for row in rows:
             f.write(json.dumps(row, ensure_ascii=False) + "\n")
             n += 1

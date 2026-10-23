@@ -21,6 +21,6 @@ def test_pipeline_end_to_end(tmp_path, tiny_corpus):
 
     # The split is deterministic: running it again gives exactly the same files.
     first = (tmp_path / "splits" / "toy.val.jsonl").read_text()
-    pipeline.split(src, tmp_path, val_fraction=0.2, seed=0)
+    pipeline.split(src, tmp_path, val_fraction=0.2, seed=0, force=True)
     assert (tmp_path / "splits" / "toy.val.jsonl").read_text() == first
     assert all("script" in json.loads(line) for line in first.splitlines())

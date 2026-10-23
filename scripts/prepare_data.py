@@ -24,6 +24,7 @@ def main() -> None:
     ap.add_argument("--only", default=None, help="comma-separated source names")
     ap.add_argument("--data-dir", default=None, help="override data_dir (e.g. a Drive folder)")
     ap.add_argument("--workers", type=int, default=None)
+    ap.add_argument("--force", action="store_true", help="redo stages whose output exists")
     args = ap.parse_args()
 
     cfg = load_data_config(args.config, args.data_dir)
@@ -46,20 +47,26 @@ def main() -> None:
             if stage == "peek":
                 pipeline.peek(src)
             elif stage == "download":
-                print(src.name, "download", pipeline.download(src, data_dir))
+                print(src.name, "download", pipeline.download(src, data_dir, args.force))
             elif stage == "clean":
-                print(src.name, "clean", pipeline.clean(src, data_dir, clean_cfg))
+                print(
+                    src.name,
+                    "clean",
+                    pipeline.clean(src, data_dir, clean_cfg, args.workers, args.force),
+                )
             elif stage == "dedup":
                 print(
                     src.name,
                     "dedup",
-                    pipeline.dedup(src, data_dir, workers=args.workers, **dedup_cfg),
+                    pipeline.dedup(
+                        src, data_dir, workers=args.workers, force=args.force, **dedup_cfg
+                    ),
                 )
             elif stage == "split":
                 print(
                     src.name,
                     "split",
-                    pipeline.split(src, data_dir, cfg["val_fraction"], cfg["seed"]),
+                    pipeline.split(src, data_dir, cfg["val_fraction"], cfg["seed"], args.force),
                 )
 
     if "stats" in stages:

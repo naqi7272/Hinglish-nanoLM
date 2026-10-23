@@ -34,6 +34,20 @@ def _count_lines(path: Path) -> int:
         return sum(1 for _ in f)
 
 
+def _done(path: Path, force: bool) -> bool:
+    """Stages skip work whose output already exists, so after a disconnect you can simply
+    re-run the same command. Outputs are written atomically, so 'exists' means 'complete'."""
+    if path.exists() and not force:
+        print(f"  skip: {path} already exists (use --force to redo)")
+        return True
+    return False
+
+
+def _pool(workers: int | None, initializer, initargs):
+    # "spawn" (not fork): forking a process that has already started torch threads can deadlock.
+    return mp.get_context("spawn").Pool(workers or os.cpu_count() or 1, initializer, initargs)
+
+
 # ---- stages ----------------------------------------------------------------------------
 
 
@@ -43,7 +57,9 @@ def peek(src: Source, n: int = 3) -> None:
         print(f"[{i}] {text[:300]!r}")
 
 
-def download(src: Source, data_dir: Path) -> dict:
+def download(src: Source, data_dir: Path, force: bool = False) -> dict:
+    if _done(_path(data_dir, "raw", src.name), force):
+        return {}
     budget = int(src.budget_mb * 1e6)
     used = 0
 
@@ -63,20 +79,43 @@ def download(src: Source, data_dir: Path) -> dict:
     return {"docs": docs, "bytes": used}
 
 
-def clean(src: Source, data_dir: Path, cfg: CleanConfig) -> dict:
+_CLEAN_CFG: CleanConfig | None = None
+
+
+def _init_clean_worker(cfg: CleanConfig) -> None:
+    global _CLEAN_CFG
+    _CLEAN_CFG = cfg
+
+
+def _clean_line(line: str) -> tuple[str, str] | None:
+    return clean_document(json.loads(line)["text"], _CLEAN_CFG)
+
+
+def clean(
+    src: Source, data_dir: Path, cfg: CleanConfig, workers: int | None = None, force: bool = False
+) -> dict:
+    out_path = _path(data_dir, "clean", src.name)
+    if _done(out_path, force):
+        return {}
+    in_path = _path(data_dir, "raw", src.name)
+    n = _count_lines(in_path)
     reasons = Counter()
 
     def rows():
-        for row in tqdm(read_jsonl(_path(data_dir, "raw", src.name)), desc=f"clean {src.name}"):
-            out = clean_document(row["text"], cfg)
-            if out is None:
-                reasons["dropped"] += 1
-                continue
-            text, script = out
-            reasons[f"script_{script}"] += 1
-            yield {"text": text, "script": script}
+        with (
+            open(in_path, encoding="utf-8") as f,
+            _pool(workers, _init_clean_worker, (cfg,)) as pool,
+        ):
+            results = pool.imap(_clean_line, f, chunksize=2000)
+            for out in tqdm(results, total=n, desc=f"clean {src.name}"):
+                if out is None:
+                    reasons["dropped"] += 1
+                    continue
+                text, script = out
+                reasons[f"script_{script}"] += 1
+                yield {"text": text, "script": script}
 
-    kept = write_jsonl(_path(data_dir, "clean", src.name), rows())
+    kept = write_jsonl(out_path, rows())
     return {"kept": kept, **reasons}
 
 
@@ -102,7 +141,11 @@ def dedup(
     max_chars: int = 4000,
     jaccard_threshold: float = 0.7,
     workers: int | None = None,
+    force: bool = False,
 ) -> dict:
+    out_path = _path(data_dir, "dedup", src.name)
+    if _done(out_path, force):
+        return {}
     in_path = _path(data_dir, "clean", src.name)
     n = _count_lines(in_path)
     hasher = MinHasher(num_perm=num_perm, ngram=ngram, max_chars=max_chars)
@@ -110,12 +153,7 @@ def dedup(
     # Pass 1: signatures for every doc (preallocated: N x num_perm uint32).
     sigs = np.empty((n, num_perm), dtype=np.uint32)
     exact = np.empty(n, dtype=np.uint64)
-    workers = workers or os.cpu_count() or 1
-    # "spawn" (not fork): forking a process that has already started torch threads can deadlock.
-    with (
-        open(in_path, encoding="utf-8") as f,
-        mp.get_context("spawn").Pool(workers, _init_worker, (hasher,)) as pool,
-    ):
+    with open(in_path, encoding="utf-8") as f, _pool(workers, _init_worker, (hasher,)) as pool:
         results = pool.imap(_hash_line, f, chunksize=512)
         for i, (sig, h) in enumerate(tqdm(results, total=n, desc=f"minhash {src.name}")):
             sigs[i], exact[i] = sig, h
@@ -128,22 +166,25 @@ def dedup(
             if keep[i]:
                 yield row
 
-    kept = write_jsonl(_path(data_dir, "dedup", src.name), rows())
+    kept = write_jsonl(out_path, rows())
     return {"in": n, "kept": kept, "removed": n - kept}
 
 
-def split(src: Source, data_dir: Path, val_fraction: float, seed: int) -> dict:
+def split(src: Source, data_dir: Path, val_fraction: float, seed: int, force: bool = False) -> dict:
     in_path = _path(data_dir, "dedup", src.name)
     out_dir = data_dir / "splits"
+    marker = out_dir / f"{src.name}.{'eval' if src.role == 'eval' else 'val'}.jsonl"
+    if _done(marker, force):
+        return {}
     out_dir.mkdir(parents=True, exist_ok=True)
     counts = Counter()
     if src.role == "eval":
         counts["eval"] = write_jsonl(out_dir / f"{src.name}.eval.jsonl", read_jsonl(in_path))
         return dict(counts)
 
-    files = {
-        s: open(out_dir / f"{src.name}.{s}.jsonl", "w", encoding="utf-8") for s in ("train", "val")
-    }
+    final = {s: out_dir / f"{src.name}.{s}.jsonl" for s in ("train", "val")}
+    tmp = {s: p.with_suffix(".jsonl.tmp") for s, p in final.items()}
+    files = {s: open(p, "w", encoding="utf-8", buffering=1 << 20) for s, p in tmp.items()}
     try:
         for row in read_jsonl(in_path):
             s = assign_split(row["text"], val_fraction, seed)
@@ -152,6 +193,8 @@ def split(src: Source, data_dir: Path, val_fraction: float, seed: int) -> dict:
     finally:
         for f in files.values():
             f.close()
+    tmp["train"].replace(final["train"])
+    tmp["val"].replace(final["val"])  # renamed last: its existence means "split finished"
     return dict(counts)
 
 
