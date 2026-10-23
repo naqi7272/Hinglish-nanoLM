@@ -1,0 +1,14 @@
+# A few steps of a tiny model on CPU, to check the whole pipeline before using a GPU.
+run_name: smoke-cpu
+tokenizer: hinglish16k
+model_size: 5m
+model: {n_layer: 2, n_head: 2, d_model: 64}
+ctx_len: 64
+batch_size: 4
+grad_accum: 2
+max_tokens: 20480
+eval_interval: 20
+eval_tokens: 2048
+ckpt_interval: 20
+log_interval: 5
+wandb_project: null
