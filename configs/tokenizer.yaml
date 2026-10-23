@@ -1,0 +1,38 @@
+# Production tokenizers (Hugging Face `tokenizers`, byte-level BPE) and the comparison setup.
+# Paths are relative to data_dir (override with --data-dir, e.g. the Drive folder).
+
+data_dir: data
+out_dir: tokenizers           # inside data_dir; the small .json files also get committed
+vocab_size: 16384             # 16k: see README "why 16k" (embedding params vs model size)
+min_frequency: 2
+special_tokens: ["<|endoftext|>"]
+seed: 1337
+
+tokenizers:
+  # Ours. The sample mix decides how many merges each script "earns": equal MB of Roman
+  # Hinglish and Devanagari Hindi, plus a little English.
+  hinglish16k:
+    sample_mb: {hingcorpus: 150, sangraha_hin: 150, fineweb_edu_en: 30}
+  # Baseline for the bits-per-byte experiment: same algorithm and size, English-only data.
+  english16k:
+    sample_mb: {fineweb_edu_en: 139}
+
+compare:
+  max_docs: 2000              # docs per eval set
+  eval_sets:                  # label -> file (relative to data_dir)
+    English: splits/fineweb_edu_en.val.jsonl
+    Hindi (Devanagari): splits/sangraha_hin.val.jsonl
+    Roman Hinglish: splits/phinc.eval.jsonl
+  # Reference tokenizers. hub: tried in order; the official Llama repo needs HF_TOKEN with
+  # access granted, otherwise an ungated mirror with the identical tokenizer is used.
+  references:
+    - {name: GPT-2, tiktoken: gpt2}
+    - {name: GPT-4o, tiktoken: o200k_base}
+    - {name: Llama 3, hub: [meta-llama/Meta-Llama-3-8B, NousResearch/Meta-Llama-3-8B]}
+    - {name: Qwen3, hub: [Qwen/Qwen3-0.6B]}
+  examples:
+    - "The weather is really nice today, let's go for a walk."
+    - "आज मौसम बहुत अच्छा है, चलो टहलने चलते हैं।"
+    - "Aaj mausam bahut accha hai, chalo walk pe chalte hain."
+    - "मैं कल Delhi जा रहा हूँ, meeting है।"
+    - "Yaar ye tokenizer Hindi ke saath itne zyada tokens kyun banata hai?"

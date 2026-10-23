@@ -26,9 +26,9 @@ KV cache) khud likha, 3 sizes ke models train kiye, aur bits-per-byte se fair co
 | Step | Kya | Status |
 |---|---|---|
 | M0 | Project setup: uv, tests, CPU/GPU auto-detect | ✅ |
-| M1 | Corpus pipeline: download → clean → dedup → split | ✅ code, ⏳ Colab run chal raha hai |
+| M1 | Corpus pipeline: download → clean → dedup → split | ✅ 4.6M docs, 1.45 GB ready |
 | M2a | BPE tokenizer scratch se (merge loop **maine khud likha**) | ✅ 16/16 tests pass |
-| M2b | Production tokenizer (16k) + GPT-4o / Llama 3 / Qwen3 se comparison | ⏳ |
+| M2b | Production tokenizer (16k) + GPT-4o / Llama 3 / Qwen3 se comparison | ⏳ code ready, Colab pe run karna hai |
 | M3 | GPT model plain PyTorch mein (attention **main khud likhunga**) | ⏳ |
 | M4 | Training loop: AdamW, cosine LR, mixed precision, checkpoints | ⏳ |
 | M5 | Experiments: 5M / 15M / 30M models, scaling plots, KV-cache speed | ⏳ |
@@ -122,6 +122,12 @@ lena padta hai.
 4. **Verify + union-find:** candidates ka similarity ≥ 0.7 ho toh same cluster; har cluster
    ka pehla doc rakho, baaki hatao.
 
+### Real result
+- HingCorpus tweets: 6.45M → 4.47M, yaani **31% duplicates** (retweets, forwards, same
+  template wale tweets).
+- Sangraha Hindi web text: sirf **2%** duplicates (already curated data).
+- Speed: Colab pe ~5,000 docs/s, 6.45M tweets ~20 minute mein.
+
 ### Kyun kiya
 Retweets aur copy-paste forwards bahut hote hain. Duplicates se model text ratta maarta hai,
 aur agar same text train aur val dono mein aa gaya toh val loss jhootha accha dikhta hai
@@ -141,6 +147,11 @@ similar pairs check hote hain. Probability = 1 − (1 − s^r)^b. b=16, r=4 pe, 
 **Q: Dedup split se pehle kyun?**
 A: Warna ek copy train mein aur doosri val mein ja sakti hai, aur model ko "already dekha
 hua" text pe test karoge.
+
+**Q: Tweets mein 31% duplicates aur web text mein sirf 2%: kyun?**
+A: Twitter pe retweets, copy-paste forwards aur template tweets ("Happy birthday bhai…")
+bahut hote hain. Sangraha already curated/filtered data hai. Ye number khud batata hai ki
+social media data pe dedup kitna zaroori hai.
 
 **Q: Library (datasketch) kyun nahi use ki?**
 A: Seekhne ke liye, aur memory ke liye. Mera version sirf signatures numpy array mein rakhta

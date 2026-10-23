@@ -17,8 +17,8 @@ dependencies = [
 [project.optional-dependencies]
 # Downloading corpora from the Hugging Face Hub (run in Colab/Kaggle).
 data = ["datasets>=3.0", "huggingface_hub>=0.25", "gdown>=5.0"]
-# Reference tokenizers for the comparison. transformers is used ONLY for AutoTokenizer.
-compare = ["tiktoken>=0.8", "transformers>=4.45"]
+# Reference tokenizers for the comparison (Llama 3 / Qwen3 load via `tokenizers` + the Hub).
+compare = ["tiktoken>=0.8", "huggingface_hub>=0.25"]
 wandb = ["wandb>=0.18"]
 
 [dependency-groups]

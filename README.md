@@ -11,9 +11,9 @@ A from-scratch learning project: train and analyze a **Hinglish tokenizer**, the
 | Milestone | State |
 |---|---|
 | M0 Scaffold (uv, device auto-detect, tests) | ✅ |
-| M1 Corpus pipeline (clean, MinHash dedup, split) | ✅ code + tests · ⏳ run on Colab/Kaggle |
-| M2a From-scratch BPE | 📝 skeleton ready, merge loop is a TODO for me to write |
-| M2b Production tokenizer + comparison vs GPT-4o / Llama 3 / Qwen3 | — |
+| M1 Corpus pipeline (clean, MinHash dedup, split) | ✅ built: 4.6M docs, 1.45 GB |
+| M2a From-scratch BPE (merge loop written by me) | ✅ |
+| M2b Production tokenizer + comparison vs GPT-4o / Llama 3 / Qwen3 | ⏳ code ready, run `notebooks/02_tokenizer.ipynb` |
 | M3 GPT model (RoPE, RMSNorm, SwiGLU, KV cache, sampling) | — |
 | M4 Trainer (AdamW, cosine LR, AMP, resumable checkpoints, W&B) | — |
 | M5 Experiments (3 sizes, bits-per-byte, KV-cache speed) | — |
@@ -37,6 +37,18 @@ Heavy work (corpus download, training) runs in `notebooks/` on Colab or Kaggle.
 | [AI4Bharat Sangraha](https://huggingface.co/datasets/ai4bharat/sangraha) (verified, Hindi) | Devanagari | train | CC BY 4.0 |
 | [FineWeb-Edu](https://huggingface.co/datasets/HuggingFaceFW/fineweb-edu) (small slice) | English | train | ODC-By 1.0 |
 | [PHINC](https://huggingface.co/datasets/veezbo/phinc) | Roman Hinglish | held-out eval | CC BY 4.0 |
+
+After cleaning and MinHash dedup (`data/stats.json`):
+
+| Source | Raw docs | Kept docs | Kept MB | Removed as duplicates |
+|---|---:|---:|---:|---:|
+| HingCorpus | 6,917,003 | 4,474,333 | 447 | 1,980,280 (31%) |
+| Sangraha Hindi | 160,326 | 157,070 | 859 | 3,060 (2%) |
+| FineWeb-Edu | 30,491 | 30,436 | 144 | 5 |
+| PHINC (eval) | 13,738 | 12,806 | 0.9 | 179 |
+
+Tweets are full of retweets and near-copies, hence 31% removed; curated web text barely
+has any. Validation is 0.5% of each training source.
 
 Because HingCorpus is **non-commercial, share-alike**, this project and anything trained on it
 (tokenizer, model weights) is for non-commercial use and shared under CC BY-NC-SA 4.0.
