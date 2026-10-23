@@ -61,7 +61,7 @@ class TrainConfig:
     grad_clip: float = 1.0
     # Bookkeeping
     eval_interval: int = 250
-    eval_tokens: int = 500_000  # per val file during training; the final eval uses all
+    eval_tokens: int = 250_000  # per val file during training; the final eval uses all
     ckpt_interval: int = 250
     log_interval: int = 10
     seed: int = 1337
