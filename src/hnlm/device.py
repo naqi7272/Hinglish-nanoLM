@@ -66,7 +66,11 @@ def get_device(prefer: str = "auto", mixed_precision: bool = True) -> DeviceInfo
 
     amp_dtype = None
     if mixed_precision and device.type == "cuda":
-        amp_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+        # Real bf16 hardware arrived with Ampere (compute capability 8.x). Don't use
+        # torch.cuda.is_bf16_supported(): by default it also says True when bf16 is only
+        # EMULATED (e.g. on a T4), which is many times slower than fp16.
+        major, _ = torch.cuda.get_device_capability(device)
+        amp_dtype = torch.bfloat16 if major >= 8 else torch.float16
     return DeviceInfo(device=device, amp_dtype=amp_dtype)
 
 

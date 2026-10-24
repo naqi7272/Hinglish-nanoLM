@@ -149,7 +149,8 @@ def train(cfg: TrainConfig, data_dir: Path, runs_dir: Path, max_steps: int | Non
     if ckpt is not None:
         model.load_state_dict(ckpt["model"])
         opt.load_state_dict(ckpt["optimizer"])
-        scaler.load_state_dict(ckpt["scaler"])
+        if ckpt["scaler"]:  # empty if saved without fp16 (precision may change on resume)
+            scaler.load_state_dict(ckpt["scaler"])
         start_step, wandb_id = ckpt["step"], ckpt.get("wandb_id")
         print(f"resumed {cfg.run_name} from step {start_step}")
 
