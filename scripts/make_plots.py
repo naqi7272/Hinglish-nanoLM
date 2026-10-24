@@ -15,7 +15,9 @@ from pathlib import Path
 from hnlm import plotting as P
 
 SIZE_RUNS = ["hinglish16k-5m", "hinglish16k-15m", "hinglish16k-30m"]
-BASELINE_PAIR = ["hinglish16k-15m", "english16k-15m"]
+# Tokenizer comparison: same model size, two tokenizers. Uses the 15M pair if both runs
+# exist, otherwise the cheaper 5M pair.
+BASELINE_PAIRS = [["hinglish16k-15m", "english16k-15m"], ["hinglish16k-5m", "english16k-5m"]]
 VAL_LABELS = {
     "hingcorpus": "Roman Hinglish (tweets)",
     "sangraha_hin": "Hindi (Devanagari)",
@@ -111,15 +113,17 @@ def plot_loss_vs_size(runs: dict, out: Path) -> list[dict]:
 
 
 def plot_bpb_tokenizers(runs: dict, out: Path) -> list[dict]:
-    if not all(n in runs for n in BASELINE_PAIR):
+    pair = next((p for p in BASELINE_PAIRS if all(n in runs for n in p)), None)
+    if pair is None:
         return []
-    final = {n: runs[n]["eval"][-1] for n in BASELINE_PAIR}
-    sets = [s for s in VAL_LABELS if f"bpb_{s}" in final[BASELINE_PAIR[0]]]
+    size = pair[0].split("-")[1].upper()
+    final = {n: runs[n]["eval"][-1] for n in pair}
+    sets = [s for s in VAL_LABELS if f"bpb_{s}" in final[pair[0]]]
     fig, ax = P.new_figure(7.5, 4)
     width = 0.36
-    labels = {"hinglish16k-15m": "hinglish16k (ours)", "english16k-15m": "english16k (baseline)"}
-    colors = {"hinglish16k-15m": P.OURS, "english16k-15m": P.NEUTRAL}
-    for i, name in enumerate(BASELINE_PAIR):
+    labels = dict(zip(pair, ["hinglish16k (ours)", "english16k (baseline)"]))
+    colors = dict(zip(pair, [P.OURS, P.NEUTRAL]))
+    for i, name in enumerate(pair):
         xs = [j + (i - 0.5) * (width + 0.02) for j in range(len(sets))]
         vals = [final[name][f"bpb_{s}"] for s in sets]
         ax.bar(xs, vals, width=width, color=colors[name], label=labels[name])
@@ -127,12 +131,15 @@ def plot_bpb_tokenizers(runs: dict, out: Path) -> list[dict]:
             ax.text(x, v, f"{v:.2f}", ha="center", va="bottom", fontsize=8, color=P.TEXT_PRIMARY)
     ax.set_xticks(range(len(sets)), [VAL_LABELS[s] for s in sets], fontsize=8)
     P.style_axes(
-        ax, "", "bits per byte (lower is better)", "Same 15M model, two tokenizers: bits per byte"
+        ax,
+        "",
+        "bits per byte (lower is better)",
+        f"Same {size} model, two tokenizers: bits per byte",
     )
     ax.grid(axis="x", visible=False)
     ax.legend(frameon=False, fontsize=9)
     P.save(fig, out)
-    return [{"val_set": s, **{n: final[n][f"bpb_{s}"] for n in BASELINE_PAIR}} for s in sets]
+    return [{"val_set": s, **{n: final[n][f"bpb_{s}"] for n in pair}} for s in sets]
 
 
 def plot_kv_speed(path: Path, out: Path) -> list[dict]:

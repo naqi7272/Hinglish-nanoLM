@@ -1,0 +1,6 @@
+# Cheaper baseline: identical to hinglish16k-5m except the tokenizer (English-only BPE).
+run_name: english16k-5m
+tokenizer: english16k
+model_size: 5m
+max_tokens: 100000000
+lr: 2.0e-3

@@ -47,7 +47,7 @@ languages.
 
 ![loss vs tokens](plots/loss_vs_tokens.png) ![loss vs size](plots/loss_vs_size.png)
 
-### 3. Hinglish vs English-only tokenizer, same 15M model (bits per byte)
+### 3. Hinglish vs English-only tokenizer, same model size (bits per byte)
 
 ![bpb](plots/bpb_tokenizers.png)
 
@@ -178,7 +178,7 @@ Step-by-step (with secrets setup and what to do on disconnects): [`docs/RUN_CHEC
 |---|---|---|---|
 | 1. Build corpus | Colab CPU | `notebooks/01_prepare_data.ipynb` | ~1 h |
 | 2. Train + compare tokenizers | Colab CPU | `notebooks/02_tokenizer.ipynb` | ~20 min |
-| 3. Train models + experiments | Colab **T4 GPU** | `notebooks/03_train.ipynb` | ~5 h total, resumable |
+| 3. Train models + experiments | Colab **T4 GPU** | `notebooks/03_train.ipynb` | many hours (the 15M run alone takes ~6 h on a free T4), resumable |
 
 Laptop (CPU) development:
 

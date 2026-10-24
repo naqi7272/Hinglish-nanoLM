@@ -49,14 +49,14 @@ Then empty the trash at https://drive.google.com/drive/trash.
    - **Smoke test:** about 1 min. The loss should go down. **If this cell fails, stop and paste me the error.**
    - **Training cells:** one per run.
 
-   | Run | Time on a T4 |
+   | Run | Status |
    |---|---|
-   | 5m | ~10 min |
-   | 15m | ~45 min |
-   | english16k-15m | ~45 min |
-   | 30m | ~3 h |
+   | hinglish16k-5m | required |
+   | hinglish16k-15m | required (slow: about 6 h on a free T4) |
+   | english16k-5m | required: the tokenizer baseline, same cost as the 5m run |
+   | hinglish16k-30m | **optional, skip it**: many hours on a free T4 |
+   | english16k-15m | optional: only if you have spare GPU time |
 
-   These times are rough estimates; the tokens/s in the log shows the real speed.
 4. **If Colab disconnects or hits its usage limit:** come back later and reconnect. Run the 4 setup cells, then the training cell that was interrupted. It prints `resumed ... from step N` and continues. Finished runs skip instantly.
 5. Run the last cells: KV-cache benchmark, samples, plots, and the `m5_results.zip` download.
 
