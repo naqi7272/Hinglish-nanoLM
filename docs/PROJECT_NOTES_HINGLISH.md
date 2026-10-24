@@ -28,11 +28,11 @@ KV cache) khud likha, 3 sizes ke models train kiye, aur bits-per-byte se fair co
 | M0 | Project setup: uv, tests, CPU/GPU auto-detect | ✅ |
 | M1 | Corpus pipeline: download → clean → dedup → split | ✅ 4.6M docs, 1.45 GB ready |
 | M2a | BPE tokenizer scratch se (merge loop **maine khud likha**) | ✅ 16/16 tests pass |
-| M2b | Production tokenizer (16k) + GPT-4o / Llama 3 / Qwen3 se comparison | ✅ code, ⏳ notebook 02 run karna hai |
+| M2b | Production tokenizer (16k) + GPT-4o / Llama 3 / Qwen3 se comparison | ✅ |
 | M3 | GPT model plain PyTorch mein | ✅ code + tests |
 | M4 | Training loop: AdamW, cosine LR, mixed precision, checkpoints | ✅ code + tests |
-| M5 | Experiments: 5M / 15M / 30M models, scaling plots, KV-cache speed | ✅ code, ⏳ notebook 03 (GPU) run karna hai |
-| M6 | README write-up | ✅ explanations, ⏳ result numbers |
+| M5 | Experiments: 5M + 15M models, tokenizer A/B, KV-cache speed | ✅ (30M skip kiya: GPU time) |
+| M6 | README write-up | ✅ |
 
 ---
 
@@ -363,9 +363,31 @@ A: Alag tokenizers alag number of tokens banate hain, toh per-token loss compare
 hai. BPB = total loss (bits mein) ÷ text ke UTF-8 bytes. Same text, same bytes, tokenizer
 koi bhi ho, toh fair comparison.
 
-**Q: Tumhare experiments kya dikhate hain?**
-A: *(results aane ke baad bharna)* (1) Bade model ka loss kam, (2) same 15M model pe Hinglish
-tokenizer vs English tokenizer ka BPB difference, Hindi pe sabse zyada, (3) KV cache speedup.
+**Q: Tumhare experiments kya dikhate hain?** (asli numbers)
+
+1. **Tokenizer:** mera 16k tokenizer Hindi pe **1.50 tokens/word**, GPT-4o (200k vocab) 1.63,
+   Llama 3 2.64, Qwen3 4.65, GPT-2 7.65. Yaani 12x chhote vocab ke saath GPT-4o se bhi kam
+   tokens. Roman Hinglish pe bhi mera best (1.55 vs GPT-4o 1.59). Price: English pe 1.60 vs
+   GPT-4o 1.25 (28% zyada tokens).
+2. **Same model, do tokenizers (5M, 100M tokens):** Hinglish tokenizer ka BPB har jagah kam:
+   Hindi pe 13.5%, Roman Hinglish pe 4–6%, aur English pe bhi 5.4%. Reason: same token budget
+   mein model zyada text dekh paata hai, aur English tokenizer Hindi ko bytes mein tod ke
+   tokens waste karta hai.
+3. **Model size:** 4.8M → 14.2M params: mean BPB 1.487 → 1.269 (15% better). Sirf 2 sizes,
+   toh "direction" dikhti hai, scaling law nahi.
+4. **KV cache:** CPU pe 480 tokens generate karne mein **10.9x fast**. T4 GPU pe ~1x (koi
+   fayda nahi)!
+
+**Q: GPU pe KV cache ne kuch kyun nahi kiya?** (bahut accha interview question)
+A: Chhota model + batch 1 pe har step ka time math nahi, overhead hai (Python + ~100 chhote GPU
+kernels launch karna). GPU ke liye 500 tokens dobara process karna aur 1 token process karna
+lagbhag same time leta hai. CPU pe math hi bottleneck hai, isliye wahan cache 10x tak fast.
+Bade models, lambe context ya bade batch pe GPU pe bhi cache bahut zaroori ho jaata hai.
+
+**Q: Training slow kyun thi?**
+A: 15M model sirf 14k tokens/s pe chal raha tha. Likely cause: PyTorch T4 pe bfloat16 ko
+"supported" bolta hai, lekin wo sirf emulate hota hai (slow). Fix: T4 jaise purane GPUs pe
+float16. Lesson: assume mat karo, measure karo.
 
 ---
 
@@ -407,20 +429,21 @@ Engineer, ya LLM/NLP roles ke liye best fit hai.
 
 ---
 
-## 16. Resume ke liye bullet points (project complete hone ke baad numbers update karna)
+## 16. Resume ke liye bullet points (real numbers ke saath)
 
-- Built a Hinglish corpus pipeline (6.9M+ docs) with Unicode-aware cleaning and from-scratch
-  **MinHash-LSH deduplication** in numpy; deterministic hash-based train/val split.
-- Implemented **byte-level BPE from scratch**; found and fixed a Devanagari pre-tokenization
-  issue (combining marks split by GPT-4's regex).
-- Compared tokenizer fertility vs **GPT-4o, Llama 3, Qwen3** on English / Hindi / Roman Hinglish. *(numbers TBD)*
+- Built a Hinglish corpus pipeline (6.9M+ raw docs → 4.6M) with Unicode-aware cleaning and
+  from-scratch **MinHash-LSH deduplication** in numpy (removed 31% near-duplicate tweets).
+- Implemented **byte-level BPE from scratch**; fixed a Devanagari pre-tokenization issue
+  (combining marks split by GPT-4's regex).
+- Trained a 16k Hinglish tokenizer that needs **fewer tokens per Hindi word than GPT-4o's
+  200k vocabulary** (1.50 vs 1.63; Llama 3: 2.64, Qwen3: 4.65).
 - Implemented a decoder-only GPT in plain PyTorch (**RoPE, RMSNorm, SwiGLU, KV cache**) with
-  tests for causality and cache correctness; trained 5M/15M/30M models on free GPUs with
-  bit-exact resumable checkpoints. *(results TBD)*
-- Compared a Hinglish vs English-only 16k tokenizer at equal model size using
-  **bits-per-byte**. *(results TBD)*
-
----
+  tests for causality and cache correctness; trained 5M/15M models on free Colab GPUs with
+  bit-exact resumable checkpoints.
+- Showed in a controlled A/B test (same model, same token budget) that the Hinglish tokenizer
+  lowers **bits-per-byte by 4–14%** vs an English-only tokenizer, on every language.
+- Measured KV-cache generation speedups of **up to 10.9× on CPU** and explained why it gave
+  none for a small model on a T4 GPU (overhead-bound decoding).
 
 ## 17. Extra tricky interview questions (practice ke liye)
 

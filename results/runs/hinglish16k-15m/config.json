@@ -1,0 +1,47 @@
+{
+  "train": {
+    "run_name": "hinglish16k-15m",
+    "tokenizer": "hinglish16k",
+    "model_size": "15m",
+    "model": {},
+    "ctx_len": 512,
+    "train_sources": [
+      "hingcorpus",
+      "sangraha_hin",
+      "fineweb_edu_en"
+    ],
+    "mix": null,
+    "max_tokens": 300000000,
+    "batch_size": 32,
+    "grad_accum": 4,
+    "lr": 0.0015,
+    "min_lr_ratio": 0.1,
+    "warmup_frac": 0.02,
+    "weight_decay": 0.1,
+    "betas": [
+      0.9,
+      0.95
+    ],
+    "grad_clip": 1.0,
+    "eval_interval": 250,
+    "eval_tokens": 250000,
+    "ckpt_interval": 250,
+    "log_interval": 10,
+    "seed": 1337,
+    "device": "auto",
+    "compile": false,
+    "wandb_project": "hinglish-nanolm"
+  },
+  "model": {
+    "vocab_size": 16384,
+    "ctx_len": 512,
+    "n_layer": 8,
+    "n_head": 6,
+    "d_model": 384,
+    "dropout": 0.0,
+    "rope_theta": 10000.0,
+    "use_sdpa": true
+  },
+  "non_embedding_params": 14162304,
+  "total_params": 20453760
+}

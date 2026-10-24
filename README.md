@@ -18,47 +18,118 @@ deduplication, BPE, the transformer, the training loop, evaluation.
 | M0 Scaffold (uv, device auto-detect, tests) | ✅ |
 | M1 Corpus pipeline (clean, MinHash dedup, split) | ✅ built: 4.6M docs, 1.45 GB |
 | M2a From-scratch BPE (merge loop written by me) | ✅ |
-| M2b Production tokenizer + comparison vs GPT-4o / Llama 3 / Qwen3 | ✅ code · ⏳ run `notebooks/02_tokenizer.ipynb` |
+| M2b Production tokenizer + comparison vs GPT-4o / Llama 3 / Qwen3 | ✅ |
 | M3 GPT model (RoPE, RMSNorm, SwiGLU, KV cache, sampling) | ✅ code + tests |
 | M4 Trainer (AdamW, cosine LR, AMP, resumable checkpoints, W&B) | ✅ code + tests |
-| M5 Experiments (3 sizes, bits-per-byte, KV-cache speed) | ✅ code · ⏳ run `notebooks/03_train.ipynb` |
-| M6 Write-up | ✅ explanations · ⏳ result numbers |
+| M5 Experiments (model sizes, bits-per-byte, KV-cache speed) | ✅ 5M + 15M trained (30M skipped: GPU time) |
+| M6 Write-up | ✅ |
 
 ---
 
 ## Results
 
-> ⏳ Plots and numbers appear here after running notebooks 02 and 03
-> (files land in `plots/` and `results/`).
+**In one line:** a 16k-token tokenizer trained on Hinglish needs **fewer tokens per word than
+GPT-4o's 200k tokenizer** on Hindi and Roman Hinglish, and at the same model size and training
+budget it gives **4–14% lower bits per byte** than an English-only tokenizer, on every
+language including English.
 
 ### 1. Tokenizers: tokens per word (lower is better)
 
 ![fertility](plots/fertility.png)
 
-Full table: [`results/tokenizer_comparison.md`](results/tokenizer_comparison.md) ·
-how each tokenizer cuts example sentences: [`results/segmentations.md`](results/segmentations.md)
+| Tokenizer | Vocab | English | Hindi (Devanagari) | Roman Hinglish |
+|---|---:|---:|---:|---:|
+| **hinglish16k (mine)** | 16,384 | 1.60 | **1.50** | **1.55** |
+| english16k (baseline) | 16,384 | 1.38 | 8.00 | 2.18 |
+| GPT-2 | 50,257 | 1.30 | 7.65 | 1.86 |
+| GPT-4o | 200,019 | **1.25** | 1.63 | 1.59 |
+| Llama 3 | 128,256 | 1.26 | 2.64 | 1.73 |
+| Qwen3 | 151,669 | 1.28 | 4.65 | 1.75 |
 
-*What to look for:* English-centric tokenizers need several tokens per Hindi word (the
-"Hindi tax"); `english16k` shows the extreme case. Bigger vocabularies (GPT-4o 200k, Qwen3
-151k) partly make up for it. `hinglish16k` is only 16k tokens but spends them on these
-languages.
+*(English: 155 FineWeb-Edu docs · Hindi: 808 Sangraha docs · Roman Hinglish: 2,000 PHINC
+sentences, all held out from training.)*
 
-### 2. Loss vs model size and tokens seen
+What it shows:
+- **The "Hindi tax" is real and varies a lot.** For the same Hindi text, Qwen3 needs 3.1× and
+  Llama 3 1.8× as many tokens as mine; GPT-2 and an English-only tokenizer need over 5×
+  (they fall back to raw bytes, see `english16k`'s 67 tokens for one short sentence below).
+- **GPT-4o is the exception**: its 200k vocabulary covers Hindi well (1.63). Mine reaches 1.50
+  with a vocabulary 12× smaller, because all of its 16k entries are spent on these languages.
+- **The trade-off**: on English mine needs 28% more tokens than GPT-4o (1.60 vs 1.25). A small
+  vocabulary can't be best at everything.
+
+How six tokenizers cut the same sentences ([full table](results/segmentations.md)):
+
+| Sentence | mine | GPT-4o | Llama 3 | Qwen3 | GPT-2 | english16k |
+|---|---:|---:|---:|---:|---:|---:|
+| The weather is really nice today, let's go for a walk. | 14 | 13 | 14 | 14 | 14 | 14 |
+| आज मौसम बहुत अच्छा है, चलो टहलने चलते हैं। | 14 | 14 | 22 | 42 | 66 | 67 |
+| Aaj mausam bahut accha hai, chalo walk pe chalte hain. | 14 | 18 | 20 | 20 | 23 | 23 |
+| मैं कल Delhi जा रहा हूँ, meeting है। | 10 | 10 | 14 | 25 | 33 | 36 |
+
+### 2. Same model, two tokenizers (bits per byte, lower is better)
+
+![bpb](plots/bpb_tokenizers.png)
+
+Two 4.8M-parameter models, identical except the tokenizer, each trained on 100M tokens of
+the same corpus:
+
+| Validation set | hinglish16k | english16k | Improvement |
+|---|---:|---:|---:|
+| Roman Hinglish (tweets) | **2.010** | 2.131 | 5.7% |
+| Hindi (Devanagari) | **0.714** | 0.826 | 13.5% |
+| English | **1.738** | 1.837 | 5.4% |
+| Roman Hinglish (PHINC, unseen source) | **2.554** | 2.671 | 4.4% |
+
+Bits per byte is measured per byte of *text*, so it's fair across tokenizers. The Hinglish
+tokenizer wins everywhere, even on English. The likely reason: with the same budget of 100M
+tokens, a tokenizer that packs more text into each token lets the model **see more text**,
+and the English-only tokenizer spends a large share of its tokens spelling Hindi out byte by
+byte. (BPB values are not comparable *across* languages: one Devanagari letter is 3 bytes.)
+
+### 3. Bigger model, lower loss
 
 ![loss vs tokens](plots/loss_vs_tokens.png) ![loss vs size](plots/loss_vs_size.png)
 
-### 3. Hinglish vs English-only tokenizer, same model size (bits per byte)
+| Model | Non-embedding params | Training tokens | Mean validation BPB |
+|---|---:|---:|---:|
+| hinglish16k-5m | 4.8M | 100M | 1.487 |
+| hinglish16k-15m | 14.2M | 300M | **1.269** (−15%) |
 
-![bpb](plots/bpb_tokenizers.png)
+Even at the same point in training (~100M tokens), the 15M model was already lower (1.38 vs
+1.49). Two sizes show the direction but not a scaling law; the 30M run (~2× the compute
+again) didn't fit in free GPU time.
 
 ### 4. Generation speed with and without KV cache
 
 ![kv cache](plots/kv_cache_speed.png)
 
-### 5. Samples
+| 15M model, batch 1 | 64 tokens | 128 | 256 | 480 |
+|---|---:|---:|---:|---:|
+| CPU: speedup from KV cache | 3.3× | 5.5× | 5.9× | **10.9×** |
+| T4 GPU: speedup from KV cache | 0.94× | 1.04× | 0.92× | 1.03× |
 
-See `results/samples_*.md`. A 30M model trained for a few hours won't be smart: expect
-fluent-looking Hinglish with little meaning. That's normal at this scale.
+A surprise worth understanding: **on the GPU the cache made no difference.** For a model this
+small with one sequence, each generation step is dominated by fixed overhead (Python and
+launching ~100 small GPU kernels), not by math: re-processing 500 tokens costs the GPU about
+the same as processing 1. On the CPU, where the math really is the bottleneck, skipping the
+recomputation gives up to 10.9×, and the gap grows with length (without a cache, step *t*
+redoes *t* tokens of work). The cache pays off on GPUs once models, batches or contexts are
+big enough that compute dominates, which is the normal case for real LLMs.
+
+### 5. Samples (15M model, temperature 0.8, top-k 50, top-p 0.95)
+
+> **Aaj office mein** bhi aise hi kaam karte hain...but at least he can also help.
+>
+> **Mummy ne bola ki** nahi toh main kabka kha jau?
+>
+> **मुझे लगता है कि** वह इस क्रीम को देखने के लिए एकदम तैयार नहीं हैं। उनकी हर जगह एक बहुत अलग जगह है।
+>
+> **The best way to learn** about a different topic in our brain. The same way they can work at a different age.
+
+Fluent-looking Hinglish, Hindi and English, switching languages naturally, with little
+meaning: about what 14M parameters and a few hours of training can do. All samples:
+`results/samples_*.md`.
 
 ---
 
@@ -200,20 +271,31 @@ training · bit-exact resume.
 
 ## What I learned
 
-*(Draft. Finalized with the experiment results.)*
-
-- Tokenizers carry hidden assumptions: one regex class (`\p{L}` without `\p{M}`) is enough to
-  make a tokenizer bad at Hindi.
-- Data work is most of the work, and measuring beats guessing: cleaning ran 18× slower on
-  Colab than on my laptop because the bottleneck was writing to Google Drive, not the code.
-- Social-media text is extremely repetitive (31% near-duplicates).
-- Small details make training robust: atomic checkpoints, seeding batches by step, testing
-  that resuming changes nothing.
+- **Tokenizers carry hidden assumptions.** One regex class (`\p{L}` without `\p{M}`) is enough
+  to cut every Hindi word apart. Choosing the training data for a tokenizer decides which
+  languages are cheap, and that cost follows the language through training and inference.
+- **A small vocabulary spent well beats a big one spent elsewhere**, for the languages you
+  care about (16k vs GPT-4o's 200k on Hindi), at a visible price on the others (English).
+- **Measure the right thing.** Per-token loss would have hidden the tokenizer effect; bits
+  per byte made it comparable.
+- **Data work is most of the work.** 31% of tweets were near-duplicates. Cleaning ran 18×
+  slower on Colab than on my laptop because writing to Google Drive was the bottleneck, not
+  the code.
+- **Performance needs measuring, not assuming.** Training ran at only 14k tokens/s; the
+  likely cause was that PyTorch reports bfloat16 as "supported" on a T4, where it's only
+  emulated, so the code now picks float16 there. And the KV cache, a big win on CPU, did
+  nothing for a tiny model on a GPU.
+- **Real LLM training is enormous.** My 14M model took hours on a free GPU. Llama 3 8B is
+  ~500× bigger and saw ~50,000× more tokens, on thousands of GPUs.
+- **Reliability is a feature.** Atomic checkpoints, batches seeded by step and a test proving
+  that a resumed run is bit-identical made Colab disconnects a non-event.
 
 ## Limitations
 
-- Small models and a few hundred million tokens: good for learning and for *relative*
-  comparisons, not a useful assistant.
+- Small models (5M, 15M) and a few hundred million tokens: good for learning and for
+  *relative* comparisons, not a useful assistant. Only two model sizes, one seed each.
+- The tokenizer A/B test is at 5M parameters only; the 15M baseline didn't fit in free GPU
+  time.
 - Tweets dominate the Roman-script data, so the model's Roman Hinglish is "Twitter style".
 - Vocab sizes differ between my tokenizer (16k) and the big ones (128k–200k), so tokenizer
   comparisons mix "what it was trained on" with "how big it is". The 16k-vs-16k BPB

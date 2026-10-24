@@ -1,0 +1,102 @@
+{
+  "sizes": [
+    {
+      "run": "hinglish16k-5m",
+      "params": 4820224,
+      "val_bpb": 1.4874
+    },
+    {
+      "run": "hinglish16k-15m",
+      "params": 14162304,
+      "val_bpb": 1.269
+    }
+  ],
+  "tokenizers_bpb": [
+    {
+      "val_set": "hingcorpus",
+      "hinglish16k-5m": 2.01008,
+      "english16k-5m": 2.13145
+    },
+    {
+      "val_set": "sangraha_hin",
+      "hinglish16k-5m": 0.71396,
+      "english16k-5m": 0.82565
+    },
+    {
+      "val_set": "fineweb_edu_en",
+      "hinglish16k-5m": 1.73812,
+      "english16k-5m": 1.83656
+    },
+    {
+      "val_set": "phinc",
+      "hinglish16k-5m": 2.55381,
+      "english16k-5m": 2.67066
+    }
+  ],
+  "kv_cache": [
+    {
+      "size": "15m",
+      "new_tokens": 64,
+      "device": "cpu, precision=float32",
+      "tok_per_s_cache": 147.1,
+      "tok_per_s_no_cache": 44.6,
+      "speedup": 3.3
+    },
+    {
+      "size": "15m",
+      "new_tokens": 128,
+      "device": "cpu, precision=float32",
+      "tok_per_s_cache": 195.3,
+      "tok_per_s_no_cache": 35.6,
+      "speedup": 5.49
+    },
+    {
+      "size": "15m",
+      "new_tokens": 256,
+      "device": "cpu, precision=float32",
+      "tok_per_s_cache": 161.1,
+      "tok_per_s_no_cache": 27.3,
+      "speedup": 5.9
+    },
+    {
+      "size": "15m",
+      "new_tokens": 480,
+      "device": "cpu, precision=float32",
+      "tok_per_s_cache": 171.0,
+      "tok_per_s_no_cache": 15.7,
+      "speedup": 10.89
+    },
+    {
+      "size": "15m",
+      "new_tokens": 64,
+      "device": "cuda (Tesla T4), precision=float16",
+      "tok_per_s_cache": 104.5,
+      "tok_per_s_no_cache": 111.4,
+      "speedup": 0.94
+    },
+    {
+      "size": "15m",
+      "new_tokens": 128,
+      "device": "cuda (Tesla T4), precision=float16",
+      "tok_per_s_cache": 115.5,
+      "tok_per_s_no_cache": 111.3,
+      "speedup": 1.04
+    },
+    {
+      "size": "15m",
+      "new_tokens": 256,
+      "device": "cuda (Tesla T4), precision=float16",
+      "tok_per_s_cache": 108.3,
+      "tok_per_s_no_cache": 117.6,
+      "speedup": 0.92
+    },
+    {
+      "size": "15m",
+      "new_tokens": 480,
+      "device": "cuda (Tesla T4), precision=float16",
+      "tok_per_s_cache": 117.6,
+      "tok_per_s_no_cache": 114.7,
+      "speedup": 1.03
+    }
+  ]
+}

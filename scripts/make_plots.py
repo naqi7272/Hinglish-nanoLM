@@ -32,13 +32,24 @@ def read_csv(path: Path) -> list[dict]:
 
 
 def load_runs(runs_dir: Path) -> dict:
+    """Finished runs only: a run stopped early (or never evaluated) would distort every
+    comparison, so it's listed and skipped."""
     runs = {}
     for d in sorted(runs_dir.iterdir()) if runs_dir.exists() else []:
-        if (d / "eval.csv").exists() and (d / "config.json").exists():
-            runs[d.name] = {
-                "eval": read_csv(d / "eval.csv"),
-                "config": json.loads((d / "config.json").read_text()),
-            }
+        if not ((d / "eval.csv").exists() and (d / "config.json").exists()):
+            continue
+        rows = read_csv(d / "eval.csv")
+        config = json.loads((d / "config.json").read_text())
+        planned = config["train"]["max_tokens"]
+        tokens_per_step = (
+            config["train"]["batch_size"]
+            * config["train"]["grad_accum"]
+            * config["train"]["ctx_len"]
+        )
+        if not rows or rows[-1]["tokens"] < (planned // tokens_per_step) * tokens_per_step:
+            print(f"skipping unfinished run: {d.name}")
+            continue
+        runs[d.name] = {"eval": rows, "config": config}
     return runs
 
 
@@ -102,6 +113,8 @@ def plot_loss_vs_size(runs: dict, out: Path) -> list[dict]:
             color=P.TEXT_PRIMARY,
         )
     ax.set_xscale("log")
+    ax.set_xticks([p[0] / 1e6 for p in pts], [f"{p[0] / 1e6:.1f}M" for p in pts])
+    ax.minorticks_off()
     P.style_axes(
         ax,
         "non-embedding parameters (millions, log scale)",
@@ -142,36 +155,67 @@ def plot_bpb_tokenizers(runs: dict, out: Path) -> list[dict]:
     return [{"val_set": s, **{n: final[n][f"bpb_{s}"] for n in pair}} for s in sets]
 
 
-def plot_kv_speed(path: Path, out: Path) -> list[dict]:
-    if not path.exists():
+def plot_kv_speed(paths: list[Path], out: Path, size: str = "15m") -> list[dict]:
+    """One panel per benchmark file (e.g. CPU and GPU), same model size in each."""
+    tables = [json.loads(p.read_text()) for p in paths if p.exists()]
+    tables = [[r for r in t if r["size"] == size] for t in tables]
+    tables = [t for t in tables if t]
+    if not tables:
         return []
-    rows = json.loads(path.read_text())
-    size = "30m" if any(r["size"] == "30m" for r in rows) else rows[0]["size"]
-    rows = [r for r in rows if r["size"] == size]
-    fig, ax = P.new_figure(6, 4)
-    xs = [r["new_tokens"] for r in rows]
-    for color, key, label in (
-        (P.SERIES[0], "tok_per_s_cache", "with KV cache"),
-        (P.SERIES[1], "tok_per_s_no_cache", "without KV cache"),
-    ):
-        ax.plot(
-            xs,
-            [r[key] for r in rows],
-            color=color,
-            linewidth=2,
-            marker="o",
-            markersize=6,
-            label=label,
-        )
-    P.style_axes(
-        ax,
-        "tokens generated",
-        "tokens per second",
-        f"Generation speed, {size} model ({rows[0]['device']})",
+    fig, axes = P.new_figure(5.2 * len(tables), 4, ncols=len(tables), squeeze=False)
+    for ax, rows in zip(axes[0], tables):
+        xs = [r["new_tokens"] for r in rows]
+        for color, key, label in (
+            (P.SERIES[0], "tok_per_s_cache", "with KV cache"),
+            (P.SERIES[1], "tok_per_s_no_cache", "without KV cache"),
+        ):
+            ax.plot(
+                xs,
+                [r[key] for r in rows],
+                color=color,
+                linewidth=2,
+                marker="o",
+                markersize=6,
+                label=label,
+            )
+        device = rows[0]["device"].split(",")[0]
+        device = "T4 GPU" if "T4" in device else device.upper() if device == "cpu" else device
+        P.style_axes(ax, "tokens generated", "tokens per second", f"{size} model on {device}")
+        ax.set_ylim(bottom=0)
+        ax.legend(frameon=False, fontsize=9)
+    fig.suptitle(
+        "Generation speed with and without KV cache",
+        x=0.01,
+        ha="left",
+        fontsize=13,
+        color=P.TEXT_PRIMARY,
     )
-    ax.legend(frameon=False, fontsize=9)
     P.save(fig, out)
-    return rows
+    return [r for t in tables for r in t]
+
+
+def plot_tokenizers(path: Path, out: Path) -> None:
+    """Redraw the tokenizer plots from results/tokenizer_comparison.json."""
+    if not path.exists():
+        return
+    from hnlm.tokenizer.compare import Metrics, plot_metric
+
+    fields = ("tokenizer", "eval_set", "vocab_size", "docs", "words", "tokens", "bytes", "chars")
+    results = [Metrics(**{k: d[k] for k in fields}) for d in json.loads(path.read_text())]
+    plot_metric(
+        results,
+        "fertility",
+        "Tokens per word (lower is better)",
+        "tokens / word",
+        out / "fertility.png",
+    )
+    plot_metric(
+        results,
+        "chars_per_token",
+        "Characters per token (higher is better)",
+        "chars / token",
+        out / "chars_per_token.png",
+    )
 
 
 def main() -> None:
@@ -187,8 +231,16 @@ def main() -> None:
     summary = {
         "sizes": plot_loss_vs_size(runs, out / "loss_vs_size.png"),
         "tokenizers_bpb": plot_bpb_tokenizers(runs, out / "bpb_tokenizers.png"),
-        "kv_cache": plot_kv_speed(res / "kv_cache_speed.json", out / "kv_cache_speed.png"),
+        "kv_cache": plot_kv_speed(
+            [
+                res / "kv_cache_speed_cpu.json",
+                res / "kv_cache_speed_gpu.json",
+                res / "kv_cache_speed.json",
+            ],
+            out / "kv_cache_speed.png",
+        ),
     }
+    plot_tokenizers(res / "tokenizer_comparison.json", out)
     res.mkdir(parents=True, exist_ok=True)
     (res / "experiments.json").write_text(json.dumps(summary, indent=2))
     print(json.dumps(summary, indent=2))
