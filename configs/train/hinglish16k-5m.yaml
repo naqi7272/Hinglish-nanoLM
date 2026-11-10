@@ -1,0 +1,6 @@
+# Model-size sweep: 5m model, ~20 tokens per non-embedding parameter (Chinchilla rule of thumb).
+run_name: hinglish16k-5m
+tokenizer: hinglish16k
+model_size: 5m
+max_tokens: 100000000
+lr: 2.0e-3

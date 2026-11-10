@@ -1,0 +1,34 @@
+[
+  {
+    "size": "15m",
+    "new_tokens": 64,
+    "device": "cpu, precision=float32",
+    "tok_per_s_cache": 147.1,
+    "tok_per_s_no_cache": 44.6,
+    "speedup": 3.3
+  },
+  {
+    "size": "15m",
+    "new_tokens": 128,
+    "device": "cpu, precision=float32",
+    "tok_per_s_cache": 195.3,
+    "tok_per_s_no_cache": 35.6,
+    "speedup": 5.49
+  },
+  {
+    "size": "15m",
+    "new_tokens": 256,
+    "device": "cpu, precision=float32",
+    "tok_per_s_cache": 161.1,
+    "tok_per_s_no_cache": 27.3,
+    "speedup": 5.9
+  },
+  {
+    "size": "15m",
+    "new_tokens": 480,
+    "device": "cpu, precision=float32",
+    "tok_per_s_cache": 171.0,
+    "tok_per_s_no_cache": 15.7,
+    "speedup": 10.89
+  }
+]
